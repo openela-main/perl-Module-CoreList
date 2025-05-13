@@ -1,8 +1,8 @@
 Name:           perl-Module-CoreList
 # Epoch to compete with perl.spec
 Epoch:          1
-Version:        5.20210320
-Release:        3%{?dist}
+Version:        5.20240609
+Release:        1%{?dist}
 Summary:        What modules are shipped with versions of perl
 License:        GPL+ or Artistic
 URL:            https://metacpan.org/release/Module-CoreList
@@ -25,7 +25,6 @@ BuildRequires:  perl(List::Util)
 BuildRequires:  perl(version) >= 0.88
 # Tests:
 BuildRequires:  perl(Test::More)
-Requires:       perl(:MODULE_COMPAT_%(eval "`perl -V:version`"; echo $version))
 Requires:       perl(List::Util)
 Requires:       perl(version) >= 0.88
 
@@ -64,17 +63,9 @@ with "%{_libexecdir}/%{name}/test".
 
 # Help file to recognise the Perl scripts and normalize shebangs
 for F in t/*.t; do
-    if head -1 "$F" | grep -q -e '^#!.*perl' ; then
-        perl -MConfig -pi -e 's|^#!.*perl\b|$Config{startperl}|' "$F"
-    else
-        perl -i -MConfig -ple 'print $Config{startperl} if $. == 1' "$F"
-    fi
+    perl -i -MConfig -ple 'print $Config{startperl} if $. == 1 && !s{\A#!.*perl\b}{$Config{startperl}}' "$F"
     chmod +x "$F"
 done
-
-# Remove release tests
-rm t/pod.t
-perl -i -ne 'print $_ unless m{^t/pod\.t}' MANIFEST
 
 %build
 perl Makefile.PL INSTALLDIRS=vendor NO_PACKLIST=1 NO_PERLLOCAL=1
@@ -82,18 +73,18 @@ perl Makefile.PL INSTALLDIRS=vendor NO_PACKLIST=1 NO_PERLLOCAL=1
 
 %install
 %{make_install}
+%{_fixperms} %{buildroot}/*
 
 # Install tests
 mkdir -p %{buildroot}/%{_libexecdir}/%{name}
 cp -a t %{buildroot}/%{_libexecdir}/%{name}
+rm -f %{buildroot}/%{_libexecdir}/%{name}/t/pod.t
 cat > %{buildroot}/%{_libexecdir}/%{name}/test << 'EOF'
 #!/bin/sh
 unset PERL_CORE
 cd %{_libexecdir}/%{name} && exec prove -I . -j "$(getconf _NPROCESSORS_ONLN)"
 EOF
 chmod +x %{buildroot}/%{_libexecdir}/%{name}/test
-
-%{_fixperms} $RPM_BUILD_ROOT/*
 
 %check
 unset PERL_CORE
@@ -102,8 +93,8 @@ make test
 
 %files
 %doc Changes README
-%{perl_vendorlib}/*
-%{_mandir}/man3/*
+%{perl_vendorlib}/Module
+%{_mandir}/man3/Module::CoreList*
 
 %files tools
 %doc README
@@ -114,6 +105,9 @@ make test
 %{_libexecdir}/%{name}
 
 %changelog
+* Tue Nov 19 2024 Jitka Plesnikova <jplesnik@redhat.com> - 1:5.20240609
+- Resolves: RHEL-5539 - 5.20240609 bump
+
 * Mon Aug 09 2021 Mohan Boddu <mboddu@redhat.com> - 1:5.20210320-3
 - Rebuilt for IMA sigs, glibc 2.34, aarch64 flags
   Related: rhbz#1991688
